@@ -23,7 +23,7 @@
           <a href="#como-funciona">Como Funciona</a>
           <a href="#sobre">Sobre</a>
         </div>
-        <button class="btn-cadastrar">Cadastrar</button>
+        <a href="{{ route('register') }}" class="btn-cadastrar">Cadastrar</a>
       </nav>
     </header>
 
@@ -34,7 +34,7 @@
           <h1>Sua Cidade,<br><span class="accent">Seu Cuidado.</span></h1>
           <p>Ajude a tornar sua cidade melhor. Registre problemas urbanos do seu bairro e acompanhe a resolução.</p>
           <div class="hero-buttons">
-            <button class="btn-primary">Denunciar</button>
+            <a href="{{ route('login') }}" class="btn-primary">Denunciar</a>
             <a href="#como-funciona" class="link-secondary">Saiba Mais</a>
           </div>
         </div>
