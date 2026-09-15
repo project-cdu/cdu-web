@@ -2,11 +2,26 @@
 
 class Agent extends Controller
 {
-    public function index()
+
+    public function __construct()
     {
-        return view('agent.index');
+        
+    }
+    public function __GET($atributo)
+    {
+        if (!property_exists($this, $atributo)) {
+            throw new Exception("Atributo $atributo não existe na classe Datajud");
+        }
+        return $this->$atributo;
     }
 
+    public function __SET($atributo, $valor)
+    {
+        if (!property_exists($this, $atributo)) {
+            throw new Exception("Atributo $atributo não existe na classe Datajud");
+        }
+        $this->$atributo = $valor;
+    }
     public function GetorInsert()
     {
       if($variavel == null) return;
