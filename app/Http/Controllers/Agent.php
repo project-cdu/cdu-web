@@ -1,26 +1,26 @@
 <?php
 
-class Agent extends Controller
+class Agent
 {
 
     public function __construct()
     {
-        
+
     }
-    public function __GET($atributo)
+    public function __GET($attribute)
     {
-        if (!property_exists($this, $atributo)) {
-            throw new Exception("Atributo $atributo não existe na classe Datajud");
+        if (!property_exists($this, $attribute)) {
+            throw new Exception("Atributte $attribute not exists in  the class  Agent");
         }
-        return $this->$atributo;
+        return $this->$attribute;
     }
 
-    public function __SET($atributo, $valor)
+    public function __SET($attribute, $value)
     {
-        if (!property_exists($this, $atributo)) {
-            throw new Exception("Atributo $atributo não existe na classe Datajud");
+        if (!property_exists($this, $attribute)) {
+            throw new Exception("Atributte $attribute not exists in  the class  Agent");
         }
-        $this->$atributo = $valor;
+        $this->$attribute = $value;
     }
     public function GetorInsert()
     {
