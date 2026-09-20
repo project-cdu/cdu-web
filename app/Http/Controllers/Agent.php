@@ -14,7 +14,6 @@ class Agent
         }
         return $this->$attribute;
     }
-
     public function __SET($attribute, $value)
     {
         if (!property_exists($this, $attribute)) {
@@ -26,8 +25,9 @@ class Agent
     {
       if($variavel == null) return;
       
-       $query = 'Select * from table where column = ?';
+       $query = 'Select * from table where column = ?' PDO ;
         
+
        // Implementation for Get or Insert logic
     }
 }
