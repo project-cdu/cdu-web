@@ -5,6 +5,51 @@ use App\Models\Complaint;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
+test('o painel do cidadão mostra as dez denúncias mais recentes dele', function () {
+    $user = User::factory()->create();
+
+    foreach (range(1, 11) as $number) {
+        Complaint::factory()->create([
+            'id_user' => $user->id_user,
+            'title' => "Denúncia do painel {$number}",
+                'created_at' => now()->addMinutes($number),
+                'updated_at' => now()->addMinutes($number),
+        ]);
+    }
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee('Denúncia do painel 11')
+        ->assertDontSee('Denúncia do painel 1</strong>');
+});
+
+test('a listagem de denúncias filtra por categoria, tipo e progresso', function () {
+    $user = User::factory()->create();
+    Complaint::factory()->create([
+        'title' => 'Iluminação urgente em filtro',
+        'category' => 'Iluminação pública',
+        'high_priority' => true,
+        'status' => ComplaintStatus::IN_PROGRESS,
+    ]);
+    Complaint::factory()->create([
+        'title' => 'Buraco normal fora do filtro',
+        'category' => 'Buraco na via',
+        'high_priority' => false,
+        'status' => ComplaintStatus::PENDING,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('complaints.index', [
+            'categoria' => 'Iluminação pública',
+            'tipo' => 'urgent',
+            'progresso' => ComplaintStatus::IN_PROGRESS->value,
+        ]))
+        ->assertOk()
+        ->assertSee('Iluminação urgente em filtro')
+        ->assertDontSee('Buraco normal fora do filtro');
+});
+
 test('consulta o ViaCEP e retorna todos os dados do CEP', function () {
     Http::fake([
         'https://viacep.com.br/*' => Http::response([

@@ -25,10 +25,26 @@ class ComplaintController extends Controller
         'Vazamento de água', 'Pragas e animais', 'Outros',
     ];
 
+    public function dashboard(Request $request)
+    {
+        $recentComplaints = Complaint::query()
+            ->with('images')
+            ->where('id_user', $request->user()->id_user)
+            ->latest()
+            ->limit(10)
+            ->get()
+            ->map(fn (Complaint $complaint): array => $this->toViewData($complaint))
+            ->all();
+
+        return view('dashboard', compact('recentComplaints'));
+    }
+
     public function index(Request $request)
     {
         $search = trim((string) $request->query('busca', ''));
         $query = Complaint::query()->with('images')->latest();
+
+        $this->applyCitizenFilters($query, $request);
 
         if ($search !== '') {
             $term = '%'.mb_strtolower($search).'%';
@@ -45,6 +61,7 @@ class ComplaintController extends Controller
         return view('complaints.index', [
             'complaints' => $complaints,
             'search' => $search,
+            ...$this->citizenFilterViewData($request),
             'pendingDeletionRequests' => $this->pendingDeletionRequests($request),
             'pendingUpdateRequests' => $this->pendingUpdateRequests($request),
         ]);
@@ -62,6 +79,8 @@ class ComplaintController extends Controller
             ->where('id_user', $request->user()->id_user)
             ->latest();
 
+        $this->applyCitizenFilters($query, $request);
+
         if ($search !== '') {
             $term = '%'.mb_strtolower($search).'%';
             $query->where(fn ($q) => $q->whereRaw('LOWER(title) LIKE ?', [$term])
@@ -75,6 +94,7 @@ class ComplaintController extends Controller
                 fn (Complaint $complaint): array => $this->toViewData($complaint)
             ),
             'search' => $search,
+            ...$this->citizenFilterViewData($request),
             'myComplaints' => true,
         ]);
     }
@@ -720,6 +740,36 @@ class ComplaintController extends Controller
             ->whereNotNull('justification')
             ->latest('id')
             ->value('justification');
+    }
+
+    private function applyCitizenFilters($query, Request $request): void
+    {
+        $category = $request->query('categoria');
+        $type = $request->query('tipo');
+        $progress = $request->query('progresso');
+
+        $query
+            ->when(in_array($category, self::CATEGORIES, true), fn ($builder) => $builder->where('category', $category))
+            ->when($type === 'urgent', fn ($builder) => $builder->where('high_priority', true))
+            ->when($type === 'normal', fn ($builder) => $builder->where('high_priority', false));
+
+        $progressStatus = is_numeric($progress)
+            ? ComplaintStatus::tryFrom((int) $progress)
+            : null;
+
+        if ($progressStatus) {
+            $query->where('status', $progressStatus->value);
+        }
+    }
+
+    private function citizenFilterViewData(Request $request): array
+    {
+        return [
+            'filterCategories' => self::CATEGORIES,
+            'selectedCategory' => $request->query('categoria', ''),
+            'selectedType' => $request->query('tipo', ''),
+            'selectedProgress' => $request->query('progresso', ''),
+        ];
     }
 
     private function pendingDeletionRequests(Request $request)

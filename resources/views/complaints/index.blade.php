@@ -38,6 +38,39 @@
             <button type="submit">Buscar</button>
         </form>
 
+        <form class="complaints-filters" method="GET" action="{{ route(($myComplaints ?? false) ? 'complaints.mine' : 'complaints.index') }}" aria-label="Filtros de denúncias">
+            <label>
+                <span>Categoria</span>
+                <select name="categoria">
+                    <option value="">Todas as categorias</option>
+                    @foreach (($filterCategories ?? []) as $category)
+                        <option value="{{ $category }}" @selected(($selectedCategory ?? '') === $category)>{{ $category }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label>
+                <span>Tipo da denúncia</span>
+                <select name="tipo">
+                    <option value="">Todos os tipos</option>
+                    <option value="urgent" @selected(($selectedType ?? '') === 'urgent')>Urgente</option>
+                    <option value="normal" @selected(($selectedType ?? '') === 'normal')>Normal</option>
+                </select>
+            </label>
+            <label>
+                <span>Progresso</span>
+                <select name="progresso">
+                    <option value="">Todos os progressos</option>
+                    @foreach (\App\Enums\ComplaintStatus::cases() as $progress)
+                        <option value="{{ $progress->value }}" @selected((string) ($selectedProgress ?? '') === (string) $progress->value)>{{ $progress->label() }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <button type="submit">Filtrar</button>
+            @if (($selectedCategory ?? '') || ($selectedType ?? '') || ($selectedProgress ?? ''))
+                <a href="{{ route(($myComplaints ?? false) ? 'complaints.mine' : 'complaints.index', $search ? ['busca' => $search] : []) }}">Limpar filtros</a>
+            @endif
+        </form>
+
         <div class="complaints-list-meta">
             <p><strong>{{ method_exists($complaints, 'total') ? $complaints->total() : $complaints->count() }}</strong> {{ (method_exists($complaints, 'total') ? $complaints->total() : $complaints->count()) === 1 ? 'denúncia encontrada' : 'denúncias encontradas' }}</p>
             <span>Relatos da comunidade</span>
@@ -54,7 +87,7 @@
                 @foreach ($complaints as $complaint)
                     <article class="complaint-card">
                         <a class="complaint-card-image" href="{{ route('complaints.show', ['publicId' => $complaint['publicId']]) }}" aria-label="Ver detalhes: {{ $complaint['title'] }}">
-                            <img src="{{ route('complaints.image', ['filename' => basename($complaint['imageUrl'])]) }}" alt="Imagem da denúncia: {{ $complaint['title'] }}" loading="lazy" decoding="async" width="640" height="360">
+                            <img src="{{ $complaint['imageUrl'] ? route('complaints.image', ['filename' => basename($complaint['imageUrl'])]) : asset('favicon.ico') }}" alt="Imagem da denúncia: {{ $complaint['title'] }}" loading="lazy" decoding="async" width="640" height="360">
                             <span class="complaint-status complaint-status--{{ \Illuminate\Support\Str::slug($complaint['status']) }}">{{ $complaint['status'] }}</span>
                         </a>
                         <div class="complaint-card-content">

@@ -42,10 +42,10 @@ Route::get('/', function () {
     ]);
 });
 
-Route::get('dashboard', function (\Illuminate\Http\Request $request, BackofficeController $backoffice) {
+Route::get('dashboard', function (\Illuminate\Http\Request $request, BackofficeController $backoffice, ComplaintController $complaints) {
     return $request->user()->hasRole(\App\Enums\UserRole::AGENT)
         ? $backoffice->agentOverview($request)
-        : view('dashboard');
+        : $complaints->dashboard($request);
 })
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
