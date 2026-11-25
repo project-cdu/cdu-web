@@ -295,6 +295,11 @@
     body.cdu-home .about-project-team { border-left: 1px solid var(--cdu-border); padding-left: 28px; }
     body.cdu-home .about-project-team ul { display: grid; gap: 8px; margin: 0; padding: 0; color: var(--cdu-muted); font-size: 14px; list-style: none; }
     body.cdu-home .about-project-team li::before { margin-right: 8px; color: var(--cdu-green); content: '•'; }
+    body.cdu-home .home-footer { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 24px 0 30px; border-top: 1px solid var(--cdu-border); color: var(--cdu-muted); font-size: 12px; text-align: center; }
+    body.cdu-home .home-footer img { display: block; width: 92px; max-height: 32px; object-fit: contain; }
+    body.cdu-home .home-footer .home-footer-logo-dark { display: none; }
+    html.dark body.cdu-home .home-footer .home-footer-logo-light { display: none; }
+    html.dark body.cdu-home .home-footer .home-footer-logo-dark { display: block; }
 
     @media (max-width: 900px) {
       body.cdu-home header { padding: 16px 0; }
@@ -533,6 +538,11 @@
           </div>
         </div>
       </section>
+      <footer class="home-footer" aria-label="Rodapé">
+        <img src="{{ Vite::asset('resources/images/logo.svg') }}" alt="C.D.U" class="home-footer-logo-light">
+        <img src="{{ Vite::asset('resources/images/logo_invert.svg') }}" alt="C.D.U" class="home-footer-logo-dark">
+        <span>&copy; {{ now()->year }} C.D.U. Todos os direitos reservados.</span>
+      </footer>
     </section>
   </div>
 

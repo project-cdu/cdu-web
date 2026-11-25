@@ -45,18 +45,27 @@ new class extends Component
         }
 
         if ($this->profileImage) {
-            if ($user->profile_image) {
-                Storage::disk(config('filesystems.profile'))->delete($user->profile_image);
-                // Remove files created by the previous hard-coded public disk.
-                if (config('filesystems.profile') !== 'public') {
-                    Storage::disk('public')->delete($user->profile_image);
-                }
+            $profileDisk = config('filesystems.profile');
+            $previousPath = $user->profile_image;
+            $newPath = $this->profileImage->store('profile-images', $profileDisk);
+
+            if ($newPath === false) {
+                throw new \RuntimeException('Não foi possível salvar a foto de perfil no disco configurado.');
             }
 
-            $user->profile_image = $this->profileImage->store('profile-images', config('filesystems.profile'));
-        }
+            $user->profile_image = $newPath;
+            $user->save();
 
-        $user->save();
+            if ($previousPath) {
+                Storage::disk($profileDisk)->delete($previousPath);
+                // Remove files created by the previous hard-coded public disk.
+                if ($profileDisk !== 'public') {
+                    Storage::disk('public')->delete($previousPath);
+                }
+            }
+        } else {
+            $user->save();
+        }
 
         $this->reset('profileImage');
 

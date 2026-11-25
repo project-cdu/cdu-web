@@ -120,16 +120,86 @@ class ComplaintSeeder extends Seeder
             }
 
             if ($status !== ComplaintStatus::PENDING && $agent !== null) {
+                $justification = $this->statusJustification($status, $category, $index);
+
                 DB::table('complaint_status_histories')->insert([
                     'complaint_id' => $complaint->complaint_id,
                     'from_status' => ComplaintStatus::PENDING->value,
                     'to_status' => $status->value,
+                    'justification' => $justification,
                     'changed_by' => $agent->id_user,
                     'created_at' => $createdAt->copy()->addHours(2),
                     'updated_at' => $createdAt->copy()->addHours(2),
                 ]);
             }
         }
+    }
+
+    private function statusJustification(ComplaintStatus $status, string $category, int $index): ?string
+    {
+        $messages = match ($status) {
+            ComplaintStatus::RESOLVED => [
+                'Buraco na via' => [
+                    'O trecho foi recuperado e o buraco deixou de oferecer risco aos motoristas.',
+                    'A equipe de manutenção refez o pavimento e liberou a passagem com segurança.',
+                ],
+                'Iluminação pública' => [
+                    'A lâmpada foi substituída e o trecho voltou a receber iluminação durante a noite.',
+                    'A manutenção corrigiu o defeito no poste e restabeleceu a iluminação da via.',
+                ],
+                'Lixo acumulado' => [
+                    'A limpeza foi realizada e os resíduos foram removidos do local informado.',
+                    'A equipe de zeladoria recolheu o material e deixou a calçada novamente livre.',
+                ],
+                'Vazamento de água' => [
+                    'O vazamento foi reparado e o desperdício de água foi interrompido.',
+                    'A equipe técnica corrigiu a tubulação e normalizou as condições da via.',
+                ],
+                'Pragas e animais' => [
+                    'Foi realizada uma vistoria no local e adotadas medidas para eliminar o risco identificado.',
+                    'A ocorrência recebeu atendimento da equipe responsável e a situação foi controlada.',
+                ],
+                'Outros' => [
+                    'A equipe responsável realizou o reparo necessário e confirmou a normalização do local.',
+                    'O atendimento foi concluído após a correção do problema relatado pelo cidadão.',
+                ],
+            ],
+            ComplaintStatus::REJECTED => [
+                'Buraco na via' => [
+                    'A vistoria não confirmou a existência de um buraco no ponto indicado na denúncia.',
+                    'O local foi avaliado e o problema informado não se enquadra em manutenção viária municipal.',
+                ],
+                'Iluminação pública' => [
+                    'A equipe verificou que o ponto possui iluminação funcionando normalmente no período informado.',
+                    'A solicitação foi rejeitada porque o poste indicado pertence a uma área de responsabilidade privada.',
+                ],
+                'Lixo acumulado' => [
+                    'A vistoria constatou que o material não era responsabilidade do serviço público de coleta.',
+                    'A solicitação foi encerrada porque a área já havia sido limpa antes da análise da ocorrência.',
+                ],
+                'Vazamento de água' => [
+                    'A equipe não encontrou vazamento de responsabilidade da rede pública no endereço informado.',
+                    'A ocorrência foi encaminhada para o responsável pelo imóvel por se tratar de instalação particular.',
+                ],
+                'Pragas e animais' => [
+                    'A análise não identificou risco sanitário ou situação que exigisse atendimento municipal.',
+                    'A solicitação foi rejeitada porque o caso deve ser tratado diretamente pelo responsável pelo imóvel.',
+                ],
+                'Outros' => [
+                    'Após análise, a solicitação não se enquadrou nos serviços atendidos pela plataforma.',
+                    'A ocorrência foi rejeitada por falta de informações suficientes para confirmar o problema relatado.',
+                ],
+            ],
+            default => null,
+        };
+
+        if ($messages === null) {
+            return null;
+        }
+
+        $categoryMessages = $messages[$category] ?? $messages['Outros'];
+
+        return $categoryMessages[$index % count($categoryMessages)];
     }
 
     private function removePreviousDemoData(User $citizen): void
