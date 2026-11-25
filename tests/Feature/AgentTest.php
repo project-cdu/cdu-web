@@ -29,14 +29,26 @@ test('citizens and agents cannot reach the agent area', function () {
 });
 
 test('admin sees the list of agents only', function () {
-    User::factory()->agent()->create(['name' => 'Maria Agente']);
+    $agent = User::factory()->agent()->create(['name' => 'Maria Agente']);
     User::factory()->create(['name' => 'Joao Cidadao']);
 
     $this->actingAs(User::factory()->admin()->create())
         ->get('/agents')
         ->assertOk()
-        ->assertSee('Maria Agente')
-        ->assertDontSee('Joao Cidadao');
+        ->assertSee('data-agent-users-datatable')
+        ->assertSee(route('agents.table'));
+
+    $response = $this->actingAs(User::factory()->admin()->create())
+        ->getJson('/agents/tabela?draw=1&start=0&length=10');
+
+    $response->assertOk()
+        ->assertJsonPath('data.0.name', 'Maria Agente')
+        ->assertJsonMissingPath('data.0.id_user')
+        ->assertJsonMissingPath('data.0.password')
+        ->assertJsonMissingPath('data.0.cpf');
+
+    expect($response->json('data'))->toHaveCount(1)
+        ->and($response->json('data.0.email'))->toBe($agent->email);
 });
 
 test('admin creates an agent with hashed password and agent role', function () {

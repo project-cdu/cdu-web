@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Rules\Cpf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
@@ -19,8 +21,60 @@ class AgentController extends Controller
 {
     public function index(): View
     {
-        return view()->file(resource_path('agent/index.blade.php'), [
-            'agents' => User::agents()->orderBy('name')->paginate(15),
+        return view()->file(resource_path('agent/index.blade.php'));
+    }
+
+    public function table(Request $request): JsonResponse
+    {
+        $query = User::query()
+            ->agents()
+            ->select(['id_user', 'name', 'email', 'role', 'email_verified_at', 'created_at']);
+
+        $recordsTotal = (clone $query)->count();
+        $search = trim((string) $request->input('search.value', ''));
+
+        if ($search !== '') {
+            $query->where(function (Builder $builder) use ($search): void {
+                $builder
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        $recordsFiltered = (clone $query)->count();
+        $orderColumns = [
+            0 => 'name',
+            1 => 'email',
+            2 => 'role',
+            3 => 'email_verified_at',
+            4 => 'created_at',
+        ];
+        $orderColumn = $orderColumns[(int) $request->input('order.0.column', 4)] ?? 'created_at';
+        $orderDirection = strtolower((string) $request->input('order.0.dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $length = max(1, min((int) $request->input('length', 10), 100));
+        $start = max(0, (int) $request->input('start', 0));
+
+        $rows = $query
+            ->orderBy($orderColumn, $orderDirection)
+            ->skip($start)
+            ->take($length)
+            ->get()
+            ->map(fn (User $agent): array => [
+                'name' => $agent->name,
+                'email' => $agent->email,
+                'role' => 'Agente',
+                'verified' => $agent->email_verified_at ? 'Verificado' : 'Pendente',
+                'date' => $agent->created_at?->format('d/m/Y') ?? '—',
+                'editUrl' => auth()->user()->isAdmin() ? route('agents.edit', $agent) : null,
+                'deleteUrl' => auth()->user()->isAdmin() ? route('agents.destroy', $agent) : null,
+            ])
+            ->values();
+
+        return response()->json([
+            'draw' => (int) $request->input('draw', 0),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data' => $rows,
         ]);
     }
 

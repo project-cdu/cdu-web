@@ -120,6 +120,7 @@ Route::middleware(['auth', 'verified', 'can:access-agents'])
     ->name('agents.')
     ->group(function () {
         Route::get('/', [AgentController::class, 'index'])->name('index');
+        Route::get('tabela', [AgentController::class, 'table'])->name('table');
         Route::post('/', [AgentController::class, 'store'])->name('store');
         Route::get('{agent}/edit', [AgentController::class, 'edit'])->name('edit');
         Route::put('{agent}', [AgentController::class, 'update'])->name('update');

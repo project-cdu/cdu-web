@@ -427,6 +427,53 @@ const setupReportDataTable = () => {
     });
 };
 
+const setupAgentUsersDataTable = () => {
+    const tableElement = document.querySelector('[data-agent-users-datatable]');
+    if (!tableElement || tableElement.dataset.dataTableReady === 'true') return;
+
+    if (typeof window.DataTable === 'undefined') {
+        window.setTimeout(setupAgentUsersDataTable, 100);
+        return;
+    }
+
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;',
+    })[character]);
+
+    tableElement.dataset.dataTableReady = 'true';
+    new window.DataTable(tableElement, {
+        processing: true,
+        serverSide: true,
+        pageLength: 10,
+        lengthMenu: [[10, 20, 30, 50], [10, 20, 30, 50]],
+        searchDelay: 350,
+        order: [[4, 'desc']],
+        ajax: { url: tableElement.dataset.datatableUrl },
+        language: {
+            processing: 'Carregando...',
+            search: 'Buscar:',
+            lengthMenu: 'Mostrar _MENU_ usuários por página',
+            info: 'Mostrando _START_ a _END_ de _TOTAL_ usuários',
+            infoEmpty: 'Nenhum usuário encontrado',
+            infoFiltered: '(filtrado de _MAX_ usuários)',
+            zeroRecords: 'Nenhum usuário encontrado',
+            emptyTable: 'Nenhum agente cadastrado ainda.',
+            paginate: { first: 'Primeira', last: 'Última', next: 'Próxima', previous: 'Anterior' },
+        },
+        columns: [
+            { data: 'name', className: 'px-4 py-3 font-medium' },
+            { data: 'email', className: 'px-4 py-3' },
+            { data: 'role', className: 'px-4 py-3' },
+            {
+                data: 'verified',
+                className: 'px-4 py-3',
+                render: (value) => `<span class="agents-role-badge">${escapeHtml(value)}</span>`,
+            },
+            { data: 'date', className: 'px-4 py-3' },
+        ],
+    });
+};
+
 setTheme(localStorage.getItem(themeKey) || 'light');
 setupBackToTop();
 setupBackofficeSidebar();
@@ -434,6 +481,7 @@ setupOverviewFilters();
 setupDashboardTable();
 setupAgentDataTables();
 setupReportDataTable();
+setupAgentUsersDataTable();
 document.addEventListener('livewire:navigated', () => {
     setTheme(localStorage.getItem(themeKey) || 'light');
     setupBackToTop();
@@ -442,6 +490,7 @@ document.addEventListener('livewire:navigated', () => {
     setupDashboardTable();
     setupAgentDataTables();
     setupReportDataTable();
+    setupAgentUsersDataTable();
 });
 
 document.addEventListener('click', (event) => {
