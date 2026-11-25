@@ -120,10 +120,17 @@ class ComplaintSeeder extends Seeder
             }
 
             if ($status !== ComplaintStatus::PENDING && $agent !== null) {
+                $justification = match ($status) {
+                    ComplaintStatus::RESOLVED => 'A equipe responsável realizou o atendimento e confirmou a resolução da ocorrência.',
+                    ComplaintStatus::REJECTED => 'A solicitação foi analisada e rejeitada por não atender aos critérios de atendimento da plataforma.',
+                    default => null,
+                };
+
                 DB::table('complaint_status_histories')->insert([
                     'complaint_id' => $complaint->complaint_id,
                     'from_status' => ComplaintStatus::PENDING->value,
                     'to_status' => $status->value,
+                    'justification' => $justification,
                     'changed_by' => $agent->id_user,
                     'created_at' => $createdAt->copy()->addHours(2),
                     'updated_at' => $createdAt->copy()->addHours(2),

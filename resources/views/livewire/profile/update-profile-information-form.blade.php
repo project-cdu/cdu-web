@@ -45,18 +45,23 @@ new class extends Component
         }
 
         if ($this->profileImage) {
-            if ($user->profile_image) {
-                Storage::disk(config('filesystems.profile'))->delete($user->profile_image);
+            $profileDisk = config('filesystems.profile');
+            $previousPath = $user->profile_image;
+            $newPath = $this->profileImage->storeOrFail('profile-images', $profileDisk);
+
+            $user->profile_image = $newPath;
+            $user->save();
+
+            if ($previousPath) {
+                Storage::disk($profileDisk)->delete($previousPath);
                 // Remove files created by the previous hard-coded public disk.
-                if (config('filesystems.profile') !== 'public') {
-                    Storage::disk('public')->delete($user->profile_image);
+                if ($profileDisk !== 'public') {
+                    Storage::disk('public')->delete($previousPath);
                 }
             }
-
-            $user->profile_image = $this->profileImage->store('profile-images', config('filesystems.profile'));
+        } else {
+            $user->save();
         }
-
-        $user->save();
 
         $this->reset('profileImage');
 
