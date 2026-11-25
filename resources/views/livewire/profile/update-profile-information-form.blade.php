@@ -47,7 +47,11 @@ new class extends Component
         if ($this->profileImage) {
             $profileDisk = config('filesystems.profile');
             $previousPath = $user->profile_image;
-            $newPath = $this->profileImage->storeOrFail('profile-images', $profileDisk);
+            $newPath = $this->profileImage->store('profile-images', $profileDisk);
+
+            if ($newPath === false) {
+                throw new \RuntimeException('Não foi possível salvar a foto de perfil no disco configurado.');
+            }
 
             $user->profile_image = $newPath;
             $user->save();
