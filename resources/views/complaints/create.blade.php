@@ -51,23 +51,22 @@
                     <div class="complaint-form-section-heading"><span>02</span><div><h2>Onde acontece</h2><p>Informe o endereço e a posição aproximada.</p></div></div>
 
                     <div class="complaint-field">
+                        <label for="cep">CEP <span aria-hidden="true">*</span></label>
+                        <input id="cep" name="cep" type="text" value="{{ old('cep') }}" inputmode="numeric" maxlength="9" required placeholder="00000-000" class="{{ $errors->has('cep') ? 'is-invalid' : '' }}">
+                        @error('cep')<span class="complaint-field-error">{{ $message }}</span>@enderror
+                        <span id="cep-feedback" class="complaint-field-hint" role="status" aria-live="polite">Digite o CEP para preencher o endereço e localizar as coordenadas.</span>
+                    </div>
+
+                    <div class="complaint-field">
                         <label for="address">Endereço <span aria-hidden="true">*</span></label>
                         <input id="address" name="address" type="text" value="{{ old('address') }}" maxlength="180" required placeholder="Rua, avenida e número" class="{{ $errors->has('address') ? 'is-invalid' : '' }}">
                         @error('address')<span class="complaint-field-error">{{ $message }}</span>@enderror
                     </div>
 
-                    <div class="complaint-form-row">
-                        <div class="complaint-field">
-                            <label for="district">Bairro <span aria-hidden="true">*</span></label>
-                            <input id="district" name="district" type="text" value="{{ old('district') }}" maxlength="100" required placeholder="Seu bairro" class="{{ $errors->has('district') ? 'is-invalid' : '' }}">
-                            @error('district')<span class="complaint-field-error">{{ $message }}</span>@enderror
-                        </div>
-                        <div class="complaint-field">
-                            <label for="cep">CEP <span aria-hidden="true">*</span></label>
-                            <input id="cep" name="cep" type="text" value="{{ old('cep') }}" inputmode="numeric" maxlength="9" required placeholder="00000-000" class="{{ $errors->has('cep') ? 'is-invalid' : '' }}">
-                            @error('cep')<span class="complaint-field-error">{{ $message }}</span>@enderror
-                            <span id="cep-feedback" class="complaint-field-hint" role="status" aria-live="polite"></span>
-                        </div>
+                    <div class="complaint-field">
+                        <label for="district">Bairro <span aria-hidden="true">*</span></label>
+                        <input id="district" name="district" type="text" value="{{ old('district') }}" maxlength="100" required placeholder="Seu bairro" class="{{ $errors->has('district') ? 'is-invalid' : '' }}">
+                        @error('district')<span class="complaint-field-error">{{ $message }}</span>@enderror
                     </div>
 
                     <div class="complaint-field">
@@ -138,21 +137,27 @@
         const longitudeInput = document.getElementById('longitude');
         const cepFeedback = document.getElementById('cep-feedback');
         let cepRequest;
+        let coordinateRequest;
+        let cepData = {};
 
         const formatCep = (value) => {
             const digits = value.replace(/\D/g, '').slice(0, 8);
             return digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
         };
 
-        const lookupCoordinates = async (addressData) => {
+        const lookupCoordinates = async (addressData = cepData) => {
+            coordinateRequest?.abort();
+            coordinateRequest = new AbortController();
             const params = new URLSearchParams({
                 endereco: addressInput.value || addressData.logradouro || '',
                 bairro: addressData.bairro || '',
-                cidade: addressData.localidade || '',
+                cidade: addressData.localidade || addressData.cidade || '',
                 estado: addressData.uf || '',
                 cep: addressData.cep || cepInput.value,
+                dados_viacep: JSON.stringify(addressData),
             });
             const response = await fetch(`{{ route('complaints.geocode') }}?${params}`, {
+                signal: coordinateRequest.signal,
                 headers: { Accept: 'application/json' },
             });
             if (!response.ok) throw new Error('Falha ao localizar o endereço');
@@ -174,32 +179,30 @@
             cepFeedback.textContent = 'Buscando endereço…';
 
             try {
-                const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
+                const response = await fetch(`{{ route('complaints.cep') }}?cep=${encodeURIComponent(cep)}`, {
                     signal: cepRequest.signal,
                     headers: { Accept: 'application/json' },
                 });
                 if (!response.ok) throw new Error('Falha na consulta');
 
-                const data = await response.json();
-                if (data.erro) {
-                    cepFeedback.textContent = 'CEP não encontrado. Confira os números informados.';
-                    return;
-                }
+                const { address: data } = await response.json();
 
-                if (data.logradouro) addressInput.value = data.logradouro;
+                cepData = data;
+                const street = [data.tipo_logradouro, data.logradouro].filter(Boolean).join(' ');
+                if (street) addressInput.value = street;
                 if (data.bairro) districtInput.value = data.bairro;
-                cepFeedback.textContent = data.logradouro || data.bairro
-                    ? 'Endereço preenchido. Buscando localização aproximada…'
-                    : 'CEP localizado, mas não há endereço detalhado disponível.';
-                if (data.logradouro || data.bairro) {
-                    try {
-                        const coordinatesFound = await lookupCoordinates(data);
-                        cepFeedback.textContent = coordinatesFound
-                            ? 'Endereço e localização aproximada preenchidos. Confira o número e o ponto de referência.'
-                            : 'Endereço preenchido, mas não foi possível localizar as coordenadas automaticamente.';
-                    } catch {
-                        cepFeedback.textContent = 'Endereço preenchido. Não foi possível localizar as coordenadas automaticamente.';
-                    }
+                if (data.complemento && !document.getElementById('complement').value) {
+                    document.getElementById('complement').value = data.complemento;
+                }
+                if (data.latitude && data.longitude) {
+                    latitudeInput.value = Number(data.latitude).toFixed(6);
+                    longitudeInput.value = Number(data.longitude).toFixed(6);
+                    cepFeedback.textContent = 'Endereço e coordenadas preenchidos. Confira o número e o ponto de referência.';
+                } else if (street || data.bairro) {
+                    const coordinatesFound = await lookupCoordinates(data);
+                    cepFeedback.textContent = coordinatesFound
+                        ? 'Endereço e localização aproximada preenchidos.'
+                        : 'Endereço preenchido, mas não foi possível localizar as coordenadas automaticamente.';
                 }
             } catch (error) {
                 if (error.name !== 'AbortError') {
@@ -214,6 +217,17 @@
             if (cepInput.value.replace(/\D/g, '').length === 8) lookupCep();
         });
         cepInput?.addEventListener('blur', lookupCep);
+        addressInput?.addEventListener('blur', async () => {
+            if (!cepData.logradouro && !cepData.cidade) return;
+            try {
+                cepFeedback.textContent = 'Atualizando a localização do endereço…';
+                cepFeedback.textContent = await lookupCoordinates(cepData)
+                    ? 'Endereço e localização aproximada atualizados.'
+                    : 'Endereço preenchido, mas não foi possível localizar as coordenadas automaticamente.';
+            } catch (error) {
+                if (error.name !== 'AbortError') cepFeedback.textContent = 'Não foi possível atualizar as coordenadas automaticamente.';
+            }
+        });
 
         document.getElementById('locate-me')?.addEventListener('click', () => {
             const feedback = document.getElementById('location-feedback');

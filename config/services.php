@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'buscarcep' => [
+        'url' => env('BUSCARCEP_API_URL', 'https://buscarcep.com.br/'),
+        'key' => env('BUSCARCEP_API_KEY', 'Chave_Gratuita_BuscarCep'),
+    ],
+
 ];

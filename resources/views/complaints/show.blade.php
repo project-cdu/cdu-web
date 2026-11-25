@@ -100,11 +100,25 @@
                 <section id="andamento" class="complaint-detail-panel complaint-history-card">
                     <p class="complaint-section-kicker">Acompanhamento</p>
                     <h2>Andamento</h2>
-                    <div class="complaint-timeline">
-                        <span class="complaint-timeline-marker" aria-hidden="true"></span>
-                        <div><strong>Denúncia registrada</strong><span>{{ \Illuminate\Support\Carbon::parse($complaint['createdAt'])->format('d/m/Y · H:i') }}</span></div>
+                    <div class="complaint-timeline-list">
+                        <div class="complaint-timeline">
+                            <span class="complaint-timeline-marker" aria-hidden="true"></span>
+                            <div><strong>Denúncia registrada</strong><span>{{ \Illuminate\Support\Carbon::parse($complaint['createdAt'])->format('d/m/Y · H:i') }}</span></div>
+                        </div>
+                        @foreach (($complaint['statusHistory'] ?? []) as $history)
+                            <div class="complaint-timeline">
+                                <span class="complaint-timeline-marker" aria-hidden="true"></span>
+                                <div>
+                                    <strong>Status atualizado: {{ $history['status'] }}</strong>
+                                    <span>{{ \Illuminate\Support\Carbon::parse($history['createdAt'])->format('d/m/Y · H:i') }}</span>
+                                    @if (!empty($history['justification']))
+                                        <span>{{ $history['justification'] }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
-                    <p class="complaint-history-note">Novas atualizações aparecerão aqui conforme o atendimento avançar.</p>
+                    <p class="complaint-history-note">As atualizações do atendimento aparecem aqui automaticamente.</p>
                     @if (!empty($complaint['statusJustification']))
                         <div class="complaint-status-justification">
                             <strong>Justificativa do encerramento</strong>

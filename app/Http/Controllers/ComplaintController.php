@@ -83,7 +83,7 @@ class ComplaintController extends Controller
     {
         $complaint = Complaint::query()->with('images')->where('public_id', $publicId)->firstOrFail();
 
-        return view('complaints.show', ['complaint' => $this->toViewData($complaint)]);
+        return view('complaints.show', ['complaint' => $this->toViewData($complaint, true)]);
     }
 
     public function create()
@@ -551,19 +551,28 @@ class ComplaintController extends Controller
             'cidade' => ['nullable', 'string', 'max:100'],
             'estado' => ['nullable', 'string', 'max:100'],
             'cep' => ['nullable', 'string', 'max:9'],
+            'dados_viacep' => ['nullable', 'json', 'max:2000'],
         ]);
+
+        $viaCep = json_decode($data['dados_viacep'] ?? '{}', true) ?: [];
+        $street = implode(', ', array_filter([
+            $data['endereco'] ?? $viaCep['logradouro'] ?? '',
+            $viaCep['complemento'] ?? '',
+        ]));
+        $city = $data['cidade'] ?? $viaCep['localidade'] ?? $viaCep['cidade'] ?? '';
+        $state = $data['estado'] ?? $viaCep['uf'] ?? '';
+        $postalCode = $data['cep'] ?? $viaCep['cep'] ?? '';
 
         $client = Http::acceptJson()->withHeaders([
             'User-Agent' => 'C.D.U/1.0 (+'.config('app.url', 'http://127.0.0.1:8000').')',
             'Referer' => config('app.url', 'http://127.0.0.1:8000').'/',
         ])->retry(2, 300)->timeout(10);
 
-        $street = implode(', ', array_filter([$data['endereco'] ?? '', $data['bairro'] ?? '']));
         $response = $client->get('https://nominatim.openstreetmap.org/search', [
             'street' => $street,
-            'city' => $data['cidade'] ?? '',
-            'state' => $data['estado'] ?? '',
-            'postalcode' => preg_replace('/\D/', '', $data['cep'] ?? ''),
+            'city' => $city,
+            'state' => $state,
+            'postalcode' => preg_replace('/\D/', '', $postalCode),
             'country' => 'Brazil',
             'format' => 'jsonv2',
             'limit' => 1,
@@ -573,10 +582,11 @@ class ComplaintController extends Controller
 
         if (! $result) {
             $freeText = implode(', ', array_filter([
-                $data['endereco'] ?? '',
-                $data['bairro'] ?? '',
-                $data['cidade'] ?? '',
-                $data['estado'] ?? '',
+                $data['endereco'] ?? $viaCep['logradouro'] ?? '',
+                $data['bairro'] ?? $viaCep['bairro'] ?? '',
+                $city,
+                $state,
+                $postalCode,
                 'Brasil',
             ]));
 
@@ -586,20 +596,63 @@ class ComplaintController extends Controller
                 'limit' => 1,
                 'countrycodes' => 'br',
             ]);
-            $result = $fallback->json()[0] ?? null;
+            $response = $fallback;
+            $result = $response->json()[0] ?? null;
         }
 
-        if (! $response->successful() || ! $result || ! isset($result['lat'], $result['lon'])) {
-            return response()->json(['coordinates' => null]);
+        if ($response->successful() && $result && isset($result['lat'], $result['lon'])) {
+            return response()->json(['coordinates' => [
+                'latitude' => (float) $result['lat'],
+                'longitude' => (float) $result['lon'],
+                'source' => 'openstreetmap',
+            ]]);
         }
 
-        return response()->json(['coordinates' => [
-            'latitude' => (float) $result['lat'],
-            'longitude' => (float) $result['lon'],
-        ]]);
+        $buscarCep = Http::acceptJson()
+            ->timeout(10)
+            ->get(config('services.buscarcep.url'), [
+                'cep' => preg_replace('/\D/', '', $postalCode),
+                'formato' => 'json',
+                'chave' => config('services.buscarcep.key'),
+                'identificador' => config('app.name', 'cdu-web'),
+            ]);
+        $buscarCepData = $buscarCep->json();
+
+        if ($buscarCep->successful()
+            && is_array($buscarCepData)
+            && ($buscarCepData['resultado'] ?? '0') === '1'
+            && isset($buscarCepData['latitude'], $buscarCepData['longitude'])) {
+            return response()->json(['coordinates' => [
+                'latitude' => (float) $buscarCepData['latitude'],
+                'longitude' => (float) $buscarCepData['longitude'],
+                'source' => 'buscarcep',
+            ]]);
+        }
+
+        return response()->json(['coordinates' => null]);
     }
 
-    private function toViewData(Complaint $complaint): array
+    public function lookupCep(Request $request)
+    {
+        $validated = $request->validate([
+            'cep' => ['required', 'string', 'regex:/^\d{5}-?\d{3}$/'],
+        ]);
+
+        $response = Http::acceptJson()
+            ->timeout(10)
+            ->get('https://viacep.com.br/ws/'.preg_replace('/\D/', '', $validated['cep']).'/json/');
+
+        $data = $response->json();
+        if (! $response->successful() || ! is_array($data) || isset($data['erro'])) {
+            return response()->json([
+                'message' => 'CEP não encontrado.',
+            ], 422);
+        }
+
+        return response()->json(['address' => $data]);
+    }
+
+    private function toViewData(Complaint $complaint, bool $includeStatusHistory = false): array
     {
         $images = $complaint->images;
         $references = $images
@@ -611,6 +664,19 @@ class ComplaintController extends Controller
             $references = [basename($complaint->image_url)];
         }
         $status = $complaint->status?->label() ?? 'Em aberto';
+        $statusHistory = $includeStatusHistory
+            ? DB::table('complaint_status_histories')
+                ->where('complaint_id', $complaint->complaint_id)
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->get(['to_status', 'justification', 'created_at'])
+                ->map(fn (object $history): array => [
+                    'status' => ComplaintStatus::tryFrom((int) $history->to_status)?->label() ?? 'Atualizado',
+                    'justification' => $history->justification,
+                    'createdAt' => $history->created_at,
+                ])
+                ->all()
+            : [];
         $latestDeletionRequest = $complaint->relationLoaded('deletionRequests')
             ? $complaint->deletionRequests->sortByDesc('created_at')->first()
             : null;
@@ -633,6 +699,7 @@ class ComplaintController extends Controller
             'deletionRequestStatus' => $latestDeletionRequest?->status?->value,
             'updateRequestStatus' => $latestUpdateRequest?->status?->value,
             'statusJustification' => $this->latestStatusJustification($complaint),
+            'statusHistory' => $statusHistory,
             'createdAt' => $complaint->created_at?->toIso8601String(),
             'location' => [
                 'latitude' => (float) $complaint->latitude,

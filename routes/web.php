@@ -112,6 +112,10 @@ Route::get('denuncias/geocode', [ComplaintController::class, 'geocode'])
     ->middleware(['auth'])
     ->name('complaints.geocode');
 
+Route::get('denuncias/cep', [ComplaintController::class, 'lookupCep'])
+    ->middleware(['auth'])
+    ->name('complaints.cep');
+
 
 
     // Gestão de agentes: apenas administradores (Gate "manage-agents")
